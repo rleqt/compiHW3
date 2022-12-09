@@ -2,9 +2,12 @@
 
 /* Declarations section */
     #include <stdio.h>
+    #include "yysType.hpp"
     #include "parser.tab.hpp"
     #include "hw3_output.hpp"
-    #include "yysType.hpp"
+    #include "symbolTable.hpp"
+
+    using namespace std;
     using namespace output;
 
 %}
@@ -50,10 +53,10 @@ continue            return CONTINUE;
 \+                  return BINOP;
 -                   return BINOP;
 
-[a-zA-Z][a-zA-Z0-9]*       /* yylval.s=yytext;*/  return ID;
-0|[1-9][0-9]*              /*yylval.intVal=atoi(yytext);*/ return NUM;
+[a-zA-Z][a-zA-Z0-9]*       { yylval.str=new string(yytext);  return ID;}
+0|[1-9][0-9]*              { yylval.str=new string(yytext);  return NUM;}
 [\t\n\r ]   {};
-\"([^\n\r\"\\]|\\[rnt\"\\])+\"	return STRING;
+\"([^\n\r\"\\]|\\[rnt\"\\])+\"	{ yylval.str=new string(yytext);  return STRING;}
 \/\/[^\r\n]*[\r|\n|\r\n]?         {};
 
 . {errorLex(yylineno); exit(1);}

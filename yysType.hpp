@@ -4,9 +4,9 @@
 
 #ifndef HW3_YYSTYPE_HPP
 #define HW3_YYSTYPE_HPP
-#include "hw3_output.hpp"
-using std::string;
-using std::vector;
+#include <string>
+#include <vector>
+using namespace std;
 extern int yylineno ;
 //#include "tokens.hpp"
 
@@ -14,20 +14,20 @@ extern int yylineno ;
 
 
 
-struct stype{
-
+class stype{
+public:
     int intVal ;
     string name;
     string type;
-     //~stype() = default;
-    /*stype(std::string typ) {
+     ~stype() = default;
+    stype(std::string typ) {
         type = typ;
         //intVal = vval;
-    }*/
+    }
 };
-#define YYSTYPE stype
 
-/*class listOfYYstype : public stype{
+
+class listOfYYstype : public stype{
     std::vector<stype> exps;
     void addyystype(stype exp){
         exps.push_back(exp);
@@ -51,9 +51,9 @@ class integerValue : public stype{
     integerValue(int value): stype("INT"){
         val = value;
     }
-};*/
+};
 
-/*
+
 class functionValue : public stype {
     bool val;
    // types type;
@@ -61,17 +61,9 @@ class functionValue : public stype {
         //val = value;
         //type = bool1;
     }
-};*/
+};
 
-/*
-void isValidByte(int n)
-{
-    if (n>255)
-    {
-        output::errorMismatch(yylineno);
-        exit(1);
-    }
-}*/
+
 
 
 

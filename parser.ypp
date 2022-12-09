@@ -1,54 +1,97 @@
 %{
 	#include <iostream>
 	#include <stdlib.h>
-	#include "yysType.hpp"
+    #include "yysType.hpp"
 	#include "symbolTable.hpp"
-
+    #include "hw3_output.hpp"
     using namespace output;
 	using namespace std;
-	 int yylex();
+	extern int yylex();
 	extern int yylineno ;
 	int yyerror(const char * message);
 %}
-%token VOID
-%token INT
-%token BYTE
-%token B
-%token BOOL
 
-%token TRUE
-%token FALSE
-%token RETURN
-%token IF
-%token WHILE
+%token VOID;
+%token INT;
+%token BYTE;
+%token B;
+%token BOOL;
 
-%token BREAK
-%token CONTINUE
-%token SC
-%token COMMA
-%token LPAREN
+%token TRUE;
+%token FALSE;
+%token RETURN;
+%token IF;
+%token WHILE;
 
-%token LBRACE
-%token RBRACE
-%token ID
-%token NUM
-%token STRING
+%token BREAK;
+%token CONTINUE;
+%token SC ;
+%token COMMA;
+%token LPAREN;
+
+%token LBRACE;
+%token RBRACE;
+%token ID;
+%token NUM;
+%token STRING ;
+
+%union{
+ struct stype* yystype;
+ int *a;
+ string * str;
+
+}
+
+%right ASSIGN;
+%left OR;
+%left AND;
+
+%left EQRELOP;
+%nonassoc RELOP ;
+%left BINOP  ;
+%left MULTBINOP ;
+%right IF ;
+%right NOT;
+%left RPAREN;
+%nonassoc ELSE;
+%nonassoc ultimate;
 
 
+%type <yystype> VOID;
+%type <yystype> INT;
+%type <yystype> BYTE;
+%type <yystype> B;
+%type <yystype> BOOL;
 
-%right ASSIGN
-%left OR
-%left AND
+%type <yystype> TRUE;
+%type <yystype> FALSE;
+%type <yystype> RETURN;
+%type <yystype> IF;
+%type <yystype> WHILE;
 
-%left EQRELOP
-%nonassoc RELOP
-%left BINOP
-%left MULTBINOP
-%right NOT
-%left RPAREN
-%nonassoc ELSE
-%nonassoc ultimate
+%type <yystype> BREAK;
+%type <yystype> CONTINUE ;
+%type <yystype> SC;
+%type <yystype> COMMA;
+%type <yystype> LPAREN;
 
+%type <yystype> LBRACE;
+%type <yystype> RBRACE;
+%type <str> ID;
+%type <str> NUM;
+%type <str> STRING;
+%type <yystype> Exp;
+%type <yystype> Type;
+%type <yystype> RetType;
+%type <yystype> Call;
+
+%type <yystype> EQRELOP;
+%type <yystype> RELOP;
+%type <yystype> BINOP;
+%type <yystype> MULTBINOP;
+%type <yystype> NOT;
+%type <yystype> RPAREN;
+%type <yystype> ELSE;
 
 %%
 
@@ -56,8 +99,8 @@
 /*2 V */Funcs: {};
 /*3 V */Funcs : FuncDecl Funcs {};
 /*4 X */FuncDecl : RetType ID LPAREN Formals RPAREN LBRACE Statements RBRACE {};
-/*5 V */RetType : Type {$$.type=$1.type;};
-/*6 V */RetType : VOID {$$.type="VOID";};
+/*5 V */RetType : Type {$$->type=$1->type;};
+/*6 V */RetType : VOID {$$->type="VOID";};
 /*7 V */Formals : {};
 /*8 X */Formals : FormalsList {};
 /*9 X */FormalsList : FormalDecl {};
@@ -90,27 +133,27 @@
 /*28X */    ExpList    : Exp {}
 /*29X */                |Exp COMMA ExpList{}
             ;
-/*30V */Type: INT {$$.type="INT";}
-/*31V */    |BYTE {$$.type="BYTE";}
-/*32V */    |BOOL {$$.type="BOOL";}
+/*30V */Type: INT {$$->type="INT";}
+/*31V */    |BYTE {$$->type="BYTE";}
+/*32V */    |BOOL {$$->type="BOOL";}
             ;
 
-/*33V */Exp  : LPAREN Exp RPAREN {$$.type=$2.type;}
+/*33V */Exp  : LPAREN Exp RPAREN {$$->type=$2->type;}
 /*34X (new one) */    |Exp IF LPAREN Exp RPAREN ELSE Exp{}
 /*35V */     |Exp MULTBINOP Exp
 
             {
-                if(($1.type == "INT" || $1.type == "BYTE") && ($3.type == "INT" || $3.type == "BYTE"))
+                if(($1->type == "INT" || $1->type == "BYTE") && ($3->type == "INT" || $3->type == "BYTE"))
                 {
 
 
-                   if($1.type == "BYTE" && $3.type == "BYTE")
+                   if($1->type == "BYTE" && $3->type == "BYTE")
                    {
-                       $$.type="BYTE";
+                       $$->type="BYTE";
                    }
                    else
                    {
-                       $$.type="INT";
+                       $$->type="INT";
                    }
                 }
                 else
@@ -122,17 +165,17 @@
             }
 /*36V */     |Exp BINOP Exp
             {
-                if(($1.type == "INT" || $1.type == "BYTE") && ($3.type == "INT" || $3.type == "BYTE"))
+                if(($1->type == "INT" || $1->type == "BYTE") && ($3->type == "INT" || $3->type == "BYTE"))
                 {
 
 
-                   if($1.type == "BYTE" && $3.type == "BYTE")
+                   if($1->type == "BYTE" && $3->type == "BYTE")
                    {
-                       $$.type="BYTE";
+                       $$->type="BYTE";
                    }
                    else
                    {
-                       $$.type="INT";
+                       $$->type="INT";
                    }
                 }
                 else
@@ -141,42 +184,42 @@
                     exit(1);
                 }
             }
-/*37XX */    |ID {isVarInTable($1.name);
-            $$.type = $1.type;
+/*37XX */    |ID {isVarInTable(*$1);
+            $$->type = "STR";
             }
-/*38V */    |Call {$$.type = $1.type;}
-/*39V */    |NUM {$$.intVal=$1.intVal;
-            $$.type = "INT";
+/*38V */    |Call {$$->type = $1->type;}
+/*39V */    |NUM {$$->intVal=stoi(*$1);
+            $$->type = "INT";
             }
             
 /*40V */   |NUM B {
-                       if ($1.intVal>255)
+                       if (stoi(*$1)>255)
                         {
-                            output::errorByteTooLarge(yylineno,to_string($1.intVal));
+                            output::errorByteTooLarge(yylineno,*$1);
                             exit(1);
                         }
-                        $$.type="BYTE";
+                        $$->type="BYTE";
 
                     }
-/*41V */    |STRING {$$.type = "STRING";}
-/*42V */    |TRUE {$$.type="BOOL";}
-/*43V */    |FALSE {$$.type="BOOL";}
+/*41V */    |STRING {}
+/*42V */    |TRUE {$$->type="BOOL";}
+/*43V */    |FALSE {$$->type="BOOL";}
 /*44V */    |NOT Exp
             {
-                if($2.type != "BOOL")
+                if($2->type != "BOOL")
                     {
                     errorMismatch(yylineno);
                     exit(1);
                     }
                 else
                     {
-                        $$.type="BOOL";
+                        $$->type="BOOL";
                     }
             }
 /*45V */    |Exp AND Exp {
-                 if($1.type == "BOOL" && $3.type == "BOOL")
+                 if($1->type == "BOOL" && $3->type == "BOOL")
                  {
-                    $$.type="BOOL";
+                    $$->type="BOOL";
                  }
                  else
                  {
@@ -185,9 +228,9 @@
                  }
              }
 /*46V */    |Exp OR Exp {
-            if($1.type == "BOOL" && $3.type == "BOOL")
+            if($1->type == "BOOL" && $3->type == "BOOL")
               {
-                 $$.type="BOOL";
+                 $$->type="BOOL";
               }
               else
               {
@@ -196,17 +239,17 @@
               }
             }
 /*47V */    |Exp EQRELOP Exp {
-                if(($1.type == "INT" || $1.type == "BYTE") && ($3.type == "INT" || $3.type == "BYTE"))
+                if(($1->type == "INT" || $1->type == "BYTE") && ($3->type == "INT" || $3->type == "BYTE"))
                 {
 
-                $$.type="BOOL";
-                   /*if(($1.type == "BYTE" && $3.type == "BYTE")
+                $$->type="BOOL";
+                   /*if(($1->type == "BYTE" && $3->type == "BYTE")
                    {
-                       $$.type="BYTE";
+                       $$->type="BYTE";
                    }
                    else
                    {
-                       $$.type="INT";
+                       $$->type="INT";
                    }*/
                 }
                 else
@@ -218,10 +261,10 @@
             }
 
  /*48V */   |Exp RELOP Exp {
-                if(($1.type == "INT" || $1.type == "BYTE") && ($3.type == "INT" || $3.type == "BYTE"))
+                if(($1->type == "INT" || $1->type == "BYTE") && ($3->type == "INT" || $3->type == "BYTE"))
                 {
 
-                $$.type="BOOL";
+                $$->type="BOOL";
 
                 }
                 else

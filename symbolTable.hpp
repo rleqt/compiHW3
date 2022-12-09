@@ -2,13 +2,13 @@
 #define HW_SYMBOL_TABLE_H
 #include <string>
 #include <vector>
-#include "yysType.hpp"
+using namespace std;
 
 struct var{
 public:
-    std::string name;
+    string name;
     int offset;
-    std::string type;
+    string type;
 
 
     var()=default;
