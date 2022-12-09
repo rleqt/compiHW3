@@ -1,0 +1,247 @@
+%{
+	#include <iostream>
+	#include <stdlib.h>
+	#include "yysType.hpp"
+	#include "symbolTable.hpp"
+
+    using namespace output;
+	using namespace std;
+	 int yylex();
+	extern int yylineno ;
+	int yyerror(const char * message);
+%}
+%token VOID
+%token INT
+%token BYTE
+%token B
+%token BOOL
+
+%token TRUE
+%token FALSE
+%token RETURN
+%token IF
+%token WHILE
+
+%token BREAK
+%token CONTINUE
+%token SC
+%token COMMA
+%token LPAREN
+
+%token LBRACE
+%token RBRACE
+%token ID
+%token NUM
+%token STRING
+
+
+
+%right ASSIGN
+%left OR
+%left AND
+
+%left EQRELOP
+%nonassoc RELOP
+%left BINOP
+%left MULTBINOP
+%right NOT
+%left RPAREN
+%nonassoc ELSE
+%nonassoc ultimate
+
+
+%%
+
+/*1 X */Program : Funcs{};
+/*2 V */Funcs: {};
+/*3 V */Funcs : FuncDecl Funcs {};
+/*4 X */FuncDecl : RetType ID LPAREN Formals RPAREN LBRACE Statements RBRACE {};
+/*5 V */RetType : Type {$$.type=$1.type;};
+/*6 V */RetType : VOID {$$.type="VOID";};
+/*7 V */Formals : {};
+/*8 X */Formals : FormalsList {};
+/*9 X */FormalsList : FormalDecl {};
+/*10X */    | FormalDecl COMMA FormalsList {};
+/*11X */    FormalDecl: Type ID {};
+
+
+
+/*12V */Statements : Statement {}
+/*13V */    |Statements Statement {}
+            ;
+
+/*14X */Statement :  LBRACE Statements RBRACE {}
+/*15X */     |Type ID SC {}
+/*16X */    |Type ID ASSIGN Exp SC {}
+/*17X */    |ID ASSIGN Exp SC { }
+/*18V */     |Call SC {}
+/*19X */    |RETURN SC {}
+/*20X */     |RETURN Exp SC {}
+            
+/*21X */    |IF LPAREN Exp RPAREN Statement {}
+/*22X */    |IF LPAREN Exp RPAREN Statement ELSE Statement{}
+/*23X */    |WHILE LPAREN Exp RPAREN Statement {}
+/*24X */    |BREAK SC {}
+/*25X */    |CONTINUE SC {}
+            ;
+/*26X */ Call  : ID LPAREN ExpList RPAREN {}
+/*27X */    |ID LPAREN RPAREN {}
+            ;
+/*28X */    ExpList    : Exp {}
+/*29X */                |Exp COMMA ExpList{}
+            ;
+/*30V */Type: INT {$$.type="INT";}
+/*31V */    |BYTE {$$.type="BYTE";}
+/*32V */    |BOOL {$$.type="BOOL";}
+            ;
+
+/*33V */Exp  : LPAREN Exp RPAREN {$$.type=$2.type;}
+/*34X (new one) */    |Exp IF LPAREN Exp RPAREN ELSE Exp{}
+/*35V */     |Exp MULTBINOP Exp
+
+            {
+                if(($1.type == "INT" || $1.type == "BYTE") && ($3.type == "INT" || $3.type == "BYTE"))
+                {
+
+
+                   if($1.type == "BYTE" && $3.type == "BYTE")
+                   {
+                       $$.type="BYTE";
+                   }
+                   else
+                   {
+                       $$.type="INT";
+                   }
+                }
+                else
+                {
+                    errorMismatch(yylineno);
+                    exit(1);
+                }
+
+            }
+/*36V */     |Exp BINOP Exp
+            {
+                if(($1.type == "INT" || $1.type == "BYTE") && ($3.type == "INT" || $3.type == "BYTE"))
+                {
+
+
+                   if($1.type == "BYTE" && $3.type == "BYTE")
+                   {
+                       $$.type="BYTE";
+                   }
+                   else
+                   {
+                       $$.type="INT";
+                   }
+                }
+                else
+                {
+                    errorMismatch(yylineno);
+                    exit(1);
+                }
+            }
+/*37XX */    |ID {isVarInTable($1.name);
+            $$.type = $1.type;
+            }
+/*38V */    |Call {$$.type = $1.type;}
+/*39V */    |NUM {$$.intVal=$1.intVal;
+            $$.type = "INT";
+            }
+            
+/*40V */   |NUM B {
+                       if ($1.intVal>255)
+                        {
+                            output::errorByteTooLarge(yylineno,to_string($1.intVal));
+                            exit(1);
+                        }
+                        $$.type="BYTE";
+
+                    }
+/*41V */    |STRING {$$.type = "STRING";}
+/*42V */    |TRUE {$$.type="BOOL";}
+/*43V */    |FALSE {$$.type="BOOL";}
+/*44V */    |NOT Exp
+            {
+                if($2.type != "BOOL")
+                    {
+                    errorMismatch(yylineno);
+                    exit(1);
+                    }
+                else
+                    {
+                        $$.type="BOOL";
+                    }
+            }
+/*45V */    |Exp AND Exp {
+                 if($1.type == "BOOL" && $3.type == "BOOL")
+                 {
+                    $$.type="BOOL";
+                 }
+                 else
+                 {
+                     errorMismatch(yylineno);
+                     exit(1);
+                 }
+             }
+/*46V */    |Exp OR Exp {
+            if($1.type == "BOOL" && $3.type == "BOOL")
+              {
+                 $$.type="BOOL";
+              }
+              else
+              {
+                  errorMismatch(yylineno);
+                  exit(1);
+              }
+            }
+/*47V */    |Exp EQRELOP Exp {
+                if(($1.type == "INT" || $1.type == "BYTE") && ($3.type == "INT" || $3.type == "BYTE"))
+                {
+
+                $$.type="BOOL";
+                   /*if(($1.type == "BYTE" && $3.type == "BYTE")
+                   {
+                       $$.type="BYTE";
+                   }
+                   else
+                   {
+                       $$.type="INT";
+                   }*/
+                }
+                else
+                {
+                    errorMismatch(yylineno);
+                    exit(1);
+                }
+
+            }
+
+ /*48V */   |Exp RELOP Exp {
+                if(($1.type == "INT" || $1.type == "BYTE") && ($3.type == "INT" || $3.type == "BYTE"))
+                {
+
+                $$.type="BOOL";
+
+                }
+                else
+                {
+                    errorMismatch(yylineno);
+                    exit(1);
+                }
+            }
+/*49X */    |LPAREN Type RPAREN Exp {}
+            ;
+%%
+
+
+int main()
+{
+	yyparse();
+}
+
+int yyerror(const char * message)
+{
+	errorSyn(yylineno);
+	exit(0);
+}
