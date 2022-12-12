@@ -1,14 +1,16 @@
 %{
 	#include <iostream>
 	#include <stdlib.h>
+	#include "hw3_output.hpp"
     #include "yysType.hpp"
 	#include "symbolTable.hpp"
-    #include "hw3_output.hpp"
+
     using namespace output;
 	using namespace std;
 	extern int yylex();
 	extern int yylineno ;
 	int yyerror(const char * message);
+	globalStack st;
 %}
 
 %token VOID;
@@ -36,10 +38,9 @@
 %token STRING ;
 
 %union{
- struct stype* yystype;
- int *a;
+ stype* yystype;
+ int *integer;
  string * str;
-
 }
 
 %right ASSIGN;
@@ -74,11 +75,14 @@
 %type <yystype> SC;
 %type <yystype> COMMA;
 %type <yystype> LPAREN;
-
+%type <yystype> Formals;
+%type <yystype> FormalsList;
+%type <yystype> ExpList;
+%type <yystype> FormalDecl;
 %type <yystype> LBRACE;
 %type <yystype> RBRACE;
 %type <str> ID;
-%type <str> NUM;
+%type <integer> NUM;
 %type <str> STRING;
 %type <yystype> Exp;
 %type <yystype> Type;
@@ -98,47 +102,135 @@
 /*1 X */Program : Funcs{};
 /*2 V */Funcs: {};
 /*3 V */Funcs : FuncDecl Funcs {};
-/*4 X */FuncDecl : RetType ID LPAREN Formals RPAREN LBRACE Statements RBRACE {};
-/*5 V */RetType : Type {$$->type=$1->type;};
-/*6 V */RetType : VOID {$$->type="VOID";};
-/*7 V */Formals : {};
-/*8 X */Formals : FormalsList {};
-/*9 X */FormalsList : FormalDecl {};
-/*10X */    | FormalDecl COMMA FormalsList {};
-/*11X */    FormalDecl: Type ID {};
+/*4 X */FuncDecl : RetType ID LPAREN Formals RPAREN {st.isFuncNotInTable(*$2); st.openScope(false, $4->varNames.size()); st.addFunc(*$2,$4->varTypes, $4->varNames , $1->type, false);} LBRACE Statements RBRACE {
+                        st.printAndExitScope();
+                    };
+
+/*5 V */RetType : Type {$$=new stype($1->type);};
+/*6 V */RetType : VOID {$$=new stype("VOID");};
+/*7 V */Formals : {$$ = new stype();};
+/*8 V */Formals : FormalsList {
+      $$->varNames=$1->varNames;
+       $$->varTypes=$1->varTypes;
+};
+/*9 V */FormalsList : FormalDecl {
+        $$->varNames=$1->varNames;
+               $$->varTypes=$1->varTypes;
+};
+         //   list = decl;
+/*10V */    | FormalDecl COMMA FormalsList {
+            $$->varNames=$1->varNames;
+               $$->varTypes=$1->varTypes;
+               $$->varNames.insert($$->varNames.end(),$3->varNames.begin(),$3->varNames.end());
+               $$->varTypes.insert($$->varTypes.end(),$3->varTypes.begin(),$3->varTypes.end());
+
+};
+             // int i,h,...;
+/*11V */    FormalDecl: Type ID {
+            $$->varTypes.push_back($1->type);
+            $$->varNames.push_back(*$2);
+};
 
 
 
 /*12V */Statements : Statement {}
-/*13V */    |Statements Statement {}
+/*13V */             |Statements Statement {}
             ;
 
-/*14X */Statement :  LBRACE Statements RBRACE {}
-/*15X */     |Type ID SC {}
-/*16X */    |Type ID ASSIGN Exp SC {}
-/*17X */    |ID ASSIGN Exp SC { }
-/*18V */     |Call SC {}
-/*19X */    |RETURN SC {}
-/*20X */     |RETURN Exp SC {}
-            
-/*21X */    |IF LPAREN Exp RPAREN Statement {}
-/*22X */    |IF LPAREN Exp RPAREN Statement ELSE Statement{}
-/*23X */    |WHILE LPAREN Exp RPAREN Statement {}
-/*24X */    |BREAK SC {}
-/*25X */    |CONTINUE SC {}
+/*14X */Statement :  LBRACE{st.openScope(false);} Statements RBRACE {
+                        st.printAndExitScope();
+                        // anything else
+                        //remember to add marker
+                        }
+/*15V */               |Type ID SC {
+    st.addToCurrentStack(*$2,$1->type);
+}
+/*16V */              |Type ID ASSIGN Exp SC {
+    if(st.getType(*$2)==$4->type||(st.getType(*$2)=="INT" &&$4->type=="BYTE"))
+    {
+        st.addToCurrentStack(*$2,$1->type);
+    }
+    else
+    {
+            errorMismatch(yylineno);
+                        exit(1);
+    }
+
+}
+/*17V */              |ID ASSIGN Exp SC {
+        st.isVarInTable(*$1);
+        if(st.getType(*$1)!=$3->type&&(st.getType(*$1)!="INT" ||$3->type!="BYTE"))
+        {
+            errorMismatch(yylineno);
+            exit(1);
+        }
+}
+                       // X=3;
+/*18V */               |Call SC {}
+/*19V */              |RETURN SC {st.checkRetType();}//compare return type
+/*20V */           |RETURN Exp SC {st.checkRetType($2->type);}
+
+/*21V */    |IF LPAREN  IFMarker RPAREN Statement CloseIFMarker;
+IFMarker : Exp{ if($1->type=="BOOL")
+                {
+                st.openScope(false);
+                }
+               else
+               {
+               errorMismatch(yylineno);
+                                   exit(1);
+               }
+
+           };
+CloseIFMarker :{st.printAndExitScope();}
+/*22V */ Statement   :IF LPAREN  IFMarker RPAREN Statement CloseIFMarker
+
+                           ELSE
+                          {
+                             st.openScope(false);
+                          }
+                          Statement {st.printAndExitScope();}
+/*23V */    |WHILE LPAREN Exp{ if($3->type=="BOOL")
+                                {
+                                st.openScope(true);
+                                }
+                               else
+                               {
+                               errorMismatch(yylineno);
+                                                   exit(1);
+                               }
+
+                           }
+                            RPAREN Statement {st.printAndExitScope();}{}
+/*24V */    |BREAK SC {
+                if(!st.isInLoop()){
+                    errorUnexpectedBreak(yylineno);
+                    exit(1);
+                }
+            }
+/*25V */    |CONTINUE SC {
+                if(!st.isInLoop()){
+                    errorUnexpectedContinue(yylineno);
+                    exit(1);
+                }
+            }
             ;
-/*26X */ Call  : ID LPAREN ExpList RPAREN {}
-/*27X */    |ID LPAREN RPAREN {}
+/*26V */ Call  : ID LPAREN ExpList RPAREN {st.isFuncInTable(*$1);
+                                          st.isTypesMatchingFunc(*$1,$3->varTypes);
+                                          $$ = new stype(st.getRetType(*$1));}
+/*27V */    |ID LPAREN RPAREN {st.isFuncInTable(*$1);
+
+                            $$->type=st.getRetType(*$1);}
             ;
-/*28X */    ExpList    : Exp {}
-/*29X */                |Exp COMMA ExpList{}
+/*28V? */    ExpList    : Exp {$$->varTypes.push_back($1->type);}
+/*29V? */                |Exp COMMA ExpList{$$->varTypes.push_back($1->type);$$->varTypes.insert($$->varTypes.end(),$3->varTypes.begin(),$3->varTypes.end());}
             ;
-/*30V */Type: INT {$$->type="INT";}
-/*31V */    |BYTE {$$->type="BYTE";}
-/*32V */    |BOOL {$$->type="BOOL";}
+/*30V */Type: INT {$$=new stype("INT");}
+/*31V */    |BYTE {$$=new stype("BYTE");}
+/*32V */    |BOOL {$$=new stype("BOOL");}
             ;
 
-/*33V */Exp  : LPAREN Exp RPAREN {$$->type=$2->type;}
+/*33V */Exp  : LPAREN Exp RPAREN {$$ = new stype($2->type);}
 /*34X (new one) */    |Exp IF LPAREN Exp RPAREN ELSE Exp{}
 /*35V */     |Exp MULTBINOP Exp
 
@@ -149,11 +241,11 @@
 
                    if($1->type == "BYTE" && $3->type == "BYTE")
                    {
-                       $$->type="BYTE";
+                       $$ = new stype("BYTE");
                    }
                    else
                    {
-                       $$->type="INT";
+                       $$ = new stype("INT");
                    }
                 }
                 else
@@ -171,11 +263,11 @@
 
                    if($1->type == "BYTE" && $3->type == "BYTE")
                    {
-                       $$->type="BYTE";
+                       $$ = new stype("BYTE");
                    }
                    else
                    {
-                       $$->type="INT";
+                       $$ = new stype("INT"); // $$ = new stype("INT")
                    }
                 }
                 else
@@ -184,26 +276,27 @@
                     exit(1);
                 }
             }
-/*37XX */    |ID {isVarInTable(*$1);
-            $$->type = "STR";
+/*37V */    |ID {st.isVarInTable(*$1);
+            $$ = new stype(st.getType(*$1)); //int i = c;
+            //will bring type
             }
-/*38V */    |Call {$$->type = $1->type;}
-/*39V */    |NUM {$$->intVal=stoi(*$1);
-            $$->type = "INT";
+/*38V */    |Call {$$ = new stype($1->type);}
+/*39V */    |NUM {
+            $$=new stype("INT", "NUM", *$1);
             }
-            
+
 /*40V */   |NUM B {
-                       if (stoi(*$1)>255)
+                       if (*$1>255)
                         {
-                            output::errorByteTooLarge(yylineno,*$1);
+                            output::errorByteTooLarge(yylineno,to_string(*$1));
                             exit(1);
                         }
-                        $$->type="BYTE";
+                        $$=new stype("BYTE");
 
                     }
 /*41V */    |STRING {}
-/*42V */    |TRUE {$$->type="BOOL";}
-/*43V */    |FALSE {$$->type="BOOL";}
+/*42V */    |TRUE {$$=new stype("BOOL");}
+/*43V */    |FALSE {$$=new stype("BOOL");}
 /*44V */    |NOT Exp
             {
                 if($2->type != "BOOL")
@@ -213,13 +306,13 @@
                     }
                 else
                     {
-                        $$->type="BOOL";
+                        $$=new stype("BOOL");
                     }
             }
 /*45V */    |Exp AND Exp {
                  if($1->type == "BOOL" && $3->type == "BOOL")
                  {
-                    $$->type="BOOL";
+                    $$=new stype("BOOL");
                  }
                  else
                  {
@@ -230,7 +323,7 @@
 /*46V */    |Exp OR Exp {
             if($1->type == "BOOL" && $3->type == "BOOL")
               {
-                 $$->type="BOOL";
+                 $$=new stype("BOOL");
               }
               else
               {
@@ -242,14 +335,14 @@
                 if(($1->type == "INT" || $1->type == "BYTE") && ($3->type == "INT" || $3->type == "BYTE"))
                 {
 
-                $$->type="BOOL";
+                $$=new stype("BOOL");
                    /*if(($1->type == "BYTE" && $3->type == "BYTE")
                    {
-                       $$->type="BYTE";
+                       $$=new stype("BYTE");
                    }
                    else
                    {
-                       $$->type="INT";
+                       $$=new stype("INT");
                    }*/
                 }
                 else
@@ -264,7 +357,7 @@
                 if(($1->type == "INT" || $1->type == "BYTE") && ($3->type == "INT" || $3->type == "BYTE"))
                 {
 
-                $$->type="BOOL";
+                $$=new stype("BOOL");
 
                 }
                 else
@@ -273,14 +366,37 @@
                     exit(1);
                 }
             }
-/*49X */    |LPAREN Type RPAREN Exp {}
-            ;
+/*49V */    |LPAREN Type RPAREN Exp {
+                                        if(($2->type == "INT" || $2->type == "BYTE") && ($4->type == "INT" || $4->type == "BYTE"))
+                                        {
+                                            $$= new stype($2->type);
+                                        }
+                                        else
+                                        {
+                                            errorMismatch(yylineno);
+                                            exit(1);
+                                        }
+                                     }
+            ;//(int) notint
 %%
 
 
 int main()
 {
+    //add print and printi to the functions stack
+    vector<string> names{"doesn't matter"};
+    vector<string> types{"STRING"};
+    st.addFunc("print", types, names, "VOID", true);
+    vector<string> namesi{"doesn't matter"};
+    vector<string> typesi{"INT"};
+    st.addFunc("printi", typesi, namesi, "VOID", true);
+
 	yyparse();
+	if(!st.wasThereAMain){
+        errorMainMissing();
+        exit(1);
+	}
+    st.closeFinal();
 }
 
 int yyerror(const char * message)
