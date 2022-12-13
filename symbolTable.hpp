@@ -129,8 +129,10 @@ public:
 		this->functions.addFunc(name, argTypes, argNames, returnType);
 		if(!print) {
 			for (int i = 0; i < argTypes.size(); ++i) {
-				scopes.back()->varStack.push_back(new var(argNames[i], argTypes[i]));
-				this->curOffset++;
+				if(!this->isVarInTableRL(argNames[i])) {
+					scopes.back()->varStack.push_back(new var(argNames[i], argTypes[i]));
+					this->curOffset++;
+				}
 			}
 			this->returnType = returnType;
 		}
@@ -217,6 +219,18 @@ public:
 		}
 		errorUndef(yylineno,name);
 		exit(1);
+	}
+	bool isVarInTableRL(string name){
+
+		for( int i=scopes.size()-1;i>=0 ;i--)
+		{
+			for( int j=0;j<scopes[i]->varStack.size();j++)
+			{
+				if (scopes[i]->varStack[j]->name == name)
+					return true;
+			}
+		}
+		return false;
 	}
 	void printing(){
 		std::cout <<(functions.funcs[0]->name)<<endl;
