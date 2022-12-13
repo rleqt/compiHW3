@@ -41,6 +41,8 @@
  stype* yystype;
  int *integer;
  string * str;
+ declaration * dec;
+ declarations * decs;
 }
 
 %right ASSIGN;
@@ -75,10 +77,10 @@
 %type <yystype> SC;
 %type <yystype> COMMA;
 %type <yystype> LPAREN;
-%type <yystype> Formals;
-%type <yystype> FormalsList;
+%type <decs> Formals;
+%type <decs> FormalsList;
 %type <yystype> ExpList;
-%type <yystype> FormalDecl;
+%type <dec> FormalDecl;
 %type <yystype> LBRACE;
 %type <yystype> RBRACE;
 %type <str> ID;
@@ -102,33 +104,29 @@
 /*1 X */Program : Funcs{};
 /*2 V */Funcs: {};
 /*3 V */Funcs : FuncDecl Funcs {};
-/*4 X */FuncDecl : RetType ID LPAREN Formals RPAREN {st.isFuncNotInTable(*$2); st.openScope(false, $4->varNames.size()); st.addFunc(*$2,$4->varTypes, $4->varNames , $1->type, false);} LBRACE Statements RBRACE {
+/*4 X */FuncDecl : RetType ID LPAREN Formals RPAREN {st.isFuncNotInTable(*$2); st.openScope(false, $4->names.size()); st.addFunc(*$2,$4->types, $4->names , $1->type, false);} LBRACE Statements RBRACE {
                         st.printAndExitScope();
                     };
 
 /*5 V */RetType : Type {$$=new stype($1->type);};
 /*6 V */RetType : VOID {$$=new stype("VOID");};
-/*7 V */Formals : {$$ = new stype();};
-/*8 V */Formals : FormalsList {
-      $$->varNames=$1->varNames;
-       $$->varTypes=$1->varTypes;
-};
-/*9 V */FormalsList : FormalDecl {
-        $$->varNames=$1->varNames;
-               $$->varTypes=$1->varTypes;
-};
-         //   list = decl;
-/*10V */    | FormalDecl COMMA FormalsList {
-            $$->varNames=$1->varNames;
+/*7 V */Formals : {$$ = new declarations();};
+/*8 V */Formals :     FormalsList                       {$$ = new declarations($1);};
+/*9 V */FormalsList : FormalDecl                        {$$ = new declarations($1->type1, $1->name1);cout<<"been here"<<endl;};
+/*10V */            | FormalDecl COMMA{cout<<"been here"<<endl;} FormalsList      {$$ = new declarations($1->type1, $1->name1, $4->types, $4->names);cout<<"been here"<<endl;
+
+            /*$$->varNames=$1->varNames;
                $$->varTypes=$1->varTypes;
                $$->varNames.insert($$->varNames.end(),$3->varNames.begin(),$3->varNames.end());
-               $$->varTypes.insert($$->varTypes.end(),$3->varTypes.begin(),$3->varTypes.end());
+               $$->varTypes.insert($$->varTypes.end(),$3->varTypes.begin(),$3->varTypes.end());*/
 
 };
-             // int i,h,...;
+             
 /*11V */    FormalDecl: Type ID {
-            $$->varTypes.push_back($1->type);
-            $$->varNames.push_back(*$2);
+            $$ = new declaration($1->type, *$2);
+            cout<<"been here"<<endl;
+            /*$$->varTypes.push_back($1->type);
+            $$->varNames.push_back(*$2);*/
 };
 
 
@@ -170,7 +168,7 @@
 /*19V */              |RETURN SC {st.checkRetType();}//compare return type
 /*20V */           |RETURN Exp SC {st.checkRetType($2->type);}
 
-/*21V */    |IF LPAREN  IFMarker RPAREN Statement CloseIFMarker;
+/*21V */    |IF LPAREN  IFMarker RPAREN Statement CloseIFMarker{};
 IFMarker : Exp{ if($1->type=="BOOL")
                 {
                 st.openScope(false);
@@ -182,7 +180,7 @@ IFMarker : Exp{ if($1->type=="BOOL")
                }
 
            };
-CloseIFMarker :{st.printAndExitScope();}
+CloseIFMarker : {st.printAndExitScope();};
 /*22V */ Statement   :IF LPAREN  IFMarker RPAREN Statement CloseIFMarker
 
                            ELSE
@@ -201,7 +199,7 @@ CloseIFMarker :{st.printAndExitScope();}
                                }
 
                            }
-                            RPAREN Statement {st.printAndExitScope();}{}
+                            RPAREN Statement {st.printAndExitScope();}
 /*24V */    |BREAK SC {
                 if(!st.isInLoop()){
                     errorUnexpectedBreak(yylineno);

@@ -22,20 +22,50 @@ public:
 	vector<string> varNames;
 	~stype() = default;
 	stype() = default;
-	stype(std::string typ, std::string name = "haha", int num = 0):intVal(num), varTypes(), varNames() {
-		this->type = typ;
+	stype(std::string type, std::string name = "haha", int num = 0):intVal(num), varTypes(), varNames() {
+		this->type = type;
 		this->name = name;
 		//intVal = vval;
 	}
 };
 
-
-class listOfYYstype : public stype{
-	std::vector<stype> exps;
-	void addyystype(stype exp){
-		exps.push_back(exp);
-	}
+class declaration : public stype{
+public:
+	string name1;
+	string type1;
+	declaration(string type, string name): type1(type), name1(name), stype("declaration"){}
 };
+
+class declarations : public stype{
+public:
+	vector<string> names;
+	vector<string> types;
+	declarations(string type, string name): stype("declarations"){
+		this->names.push_back(name);
+		this->types.push_back(type);
+	} ;
+	declarations(string type, string name, vector<string> types, vector<string> names): stype("declarations"){
+		    this->names = names;
+		    this->names.push_back(name);
+			this->types = types;
+			this->types.push_back(type);
+	};
+	declarations():names(), types(), stype("declarations"){};
+	declarations(declarations * a): stype("declarations"){
+		this->names = a->names;
+		this->types = a->types;
+	};
+};
+
+
+
+//class listOfYYstype : public stype{
+//	vector<string> varTypes;
+//	vector<string> varNames;
+//	void addyystype(stype exp){
+//		exps.push_back(exp);
+//	}
+//};
 
 class booleanValue : public stype{
 	bool val;
